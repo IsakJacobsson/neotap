@@ -1,1 +1,3 @@
 *.o
+stats/
+.vscode/
