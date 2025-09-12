@@ -10,6 +10,8 @@
 #define MAX_WORD_LEN 100  // maximum length of each word
 #define NBR_TEXT_WORDS 10 // words in text
 #define NUM_KEYS 25       // a to y
+#define KEY_STATS_FILE_BASE_NAME "stats/key_stats"
+#define OVERALL_STATS_FILE_BASE_NAME "stats/overall_stats"
 
 typedef struct
 {
@@ -29,11 +31,21 @@ typedef struct
 
 void load_key_stats(const char *filename, key_stat key_stats[])
 {
+    // initialize defaults first
+    for (int i = 0; i < NUM_KEYS; i++)
+    {
+        key_stats[i].key = 'a' + i;
+        key_stats[i].successes = 0;
+        key_stats[i].fails = 0;
+        key_stats[i].total_time = 0.0;
+        key_stats[i].attempts = 0;
+    }
+
     FILE *fp = fopen(filename, "r");
     if (!fp)
     {
-        perror("Could not open file");
-        exit(1);
+        // no file → keep defaults
+        return;
     }
 
     char key;
@@ -69,11 +81,16 @@ void save_key_stats(const char *filename, key_stat key_stats[])
 
 void load_overall_stats(const char *filename, overall_stats *stats)
 {
+    // defaults
+    stats->successes = 0;
+    stats->fails = 0;
+    stats->total_time = 0.0;
+
     FILE *fp = fopen(filename, "r");
     if (!fp)
     {
-        perror("Could not open file");
-        exit(1);
+        // no file → keep defaults
+        return;
     }
 
     int successes, fails;
@@ -222,8 +239,15 @@ void print_text(const char *text, int *failed_chars, int current_idx)
     fflush(stdout);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    if (argc < 2)
+    {
+        printf("Usage: %s <player_name>\n", argv[0]);
+        return 1;
+    }
+    const char *player_name = argv[1];
+
     // Seed the random generator
     srand(time(NULL));
 
@@ -258,8 +282,14 @@ int main(void)
     // Read stats
     key_stat key_stats[NUM_KEYS];
     overall_stats stats;
-    load_key_stats("stats/key_stats.txt", key_stats);
-    load_overall_stats("stats/overall_stats.txt", &stats);
+    char key_stats_file[256];
+    snprintf(key_stats_file, sizeof(key_stats_file), "%s_%s.txt",
+             KEY_STATS_FILE_BASE_NAME, player_name);
+    char overall_stats_file[256];
+    snprintf(overall_stats_file, sizeof(key_stats_file), "%s_%s.txt",
+             OVERALL_STATS_FILE_BASE_NAME, player_name);
+    load_key_stats(key_stats_file, key_stats);
+    load_overall_stats(overall_stats_file, &stats);
 
     // Count down
     printf("\033[?25l"); // hide cursor
@@ -352,8 +382,8 @@ int main(void)
     stats.successes += nbr_successes;
     stats.fails += nbr_fails;
     stats.total_time += elapsed_sec;
-    save_overall_stats("stats/overall_stats.txt", &stats);
-    save_key_stats("stats/key_stats.txt", key_stats);
+    save_overall_stats(overall_stats_file, &stats);
+    save_key_stats(key_stats_file, key_stats);
 
     double accuracy = (double)(nbr_successes) / (double)text_len * 100.0;
 
