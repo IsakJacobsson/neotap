@@ -20,6 +20,13 @@ typedef struct
     int attempts;
 } key_stat;
 
+typedef struct
+{
+    int successes;
+    int fails;
+    double total_time;
+} overall_stats;
+
 void load_key_stats(const char *filename, key_stat key_stats[])
 {
     FILE *fp = fopen(filename, "r");
@@ -57,6 +64,42 @@ void save_key_stats(const char *filename, key_stat key_stats[])
     {
         fprintf(fp, "%c %d %d %lf\n", key_stats[i].key, key_stats[i].successes, key_stats[i].fails, key_stats[i].total_time);
     }
+    fclose(fp);
+}
+
+void load_overall_stats(const char *filename, overall_stats *stats)
+{
+    FILE *fp = fopen(filename, "r");
+    if (!fp)
+    {
+        perror("Could not open file");
+        exit(1);
+    }
+
+    int successes, fails;
+    double total_time;
+
+    if (fscanf(fp, " %d %d %lf", &successes, &fails, &total_time) == 3)
+    {
+        stats->successes = successes;
+        stats->fails = fails;
+        stats->total_time = total_time;
+    }
+
+    fclose(fp);
+}
+
+void save_overall_stats(const char *filename, overall_stats *stats)
+{
+    FILE *fp = fopen(filename, "w");
+    if (!fp)
+    {
+        perror("Could not open file");
+        exit(1);
+    }
+
+    fprintf(fp, "%d %d %lf\n", stats->successes, stats->fails, stats->total_time);
+
     fclose(fp);
 }
 
@@ -212,9 +255,11 @@ int main(void)
         return 1;
     }
 
-    // Read stats for keys
+    // Read stats
     key_stat key_stats[NUM_KEYS];
+    overall_stats stats;
     load_key_stats("stats/key_stats.txt", key_stats);
+    load_overall_stats("stats/overall_stats.txt", &stats);
 
     // Count down
     printf("\033[?25l"); // hide cursor
@@ -284,9 +329,12 @@ int main(void)
     double elapsed_sec = (end.tv_sec - start.tv_sec) +
                          (end.tv_usec - start.tv_usec) / 1e6;
 
+    // Calculate wpm
     double nbr_words = (double)text_len / 5;
     double words_per_minute = nbr_words / elapsed_sec * 60.0;
 
+    // Tally successes and fails
+    int nbr_successes = 0;
     int nbr_fails = 0;
     for (int i = 0; i < text_len; i++)
     {
@@ -294,11 +342,20 @@ int main(void)
         {
             nbr_fails++;
         }
+        else
+        {
+            nbr_successes++;
+        }
     }
 
-    double accuracy = (double)(text_len - nbr_fails) / (double)text_len * 100.0;
-
+    // Save stats
+    stats.successes += nbr_successes;
+    stats.fails += nbr_fails;
+    stats.total_time += elapsed_sec;
+    save_overall_stats("stats/overall_stats.txt", &stats);
     save_key_stats("stats/key_stats.txt", key_stats);
+
+    double accuracy = (double)(nbr_successes) / (double)text_len * 100.0;
 
     disable_raw_mode(&old);
     free(failed_chars);
