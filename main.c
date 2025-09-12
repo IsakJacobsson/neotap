@@ -216,8 +216,21 @@ int main(void)
     key_stat key_stats[NUM_KEYS];
     load_key_stats("stats/key_stats.txt", key_stats);
 
+    // Count down
+    printf("\033[?25l"); // hide cursor
+    for (int i = 3; i > 0; i--)
+    {
+        printf("Game starts in: %d\n\033[90m%s\033[0m", i, text); // print the text in gray
+        fflush(stdout);
+        usleep(1000000);
+        printf("\033[2K\r"); // clear text line
+        printf("\033[1A");   // move cursor up
+        printf("\033[2K\r"); // clear counter line
+    }
+    printf("\033[?25h"); // show cursor again
+
     // Initial display
-    printf("%s", text);
+    printf("GO!\n%s", text);
 
     // Start timer
     struct timeval start, end, key_timer_start, key_timer_end;
@@ -230,6 +243,7 @@ int main(void)
         printf("\033[%dG", current_idx + 1);
 
         // Read input
+        tcflush(STDIN_FILENO, TCIFLUSH); // Clear pending input
         char input;
         scanf("%c", &input);
 
