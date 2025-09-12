@@ -148,6 +148,19 @@ int read_words(const char *filename, char *words[], int max_words)
     return count;
 }
 
+double average_wpm(int successes, int fails, double total_time)
+{
+    int total_chars = successes + fails;
+    if (total_time <= 0.0)
+    {
+        return 0.0; // avoid division by zero
+    }
+
+    double words_typed = (double)total_chars / 5.0; // convert chars to "words"
+
+    return words_typed / total_time * 60.0;
+}
+
 void build_test_text(
     char *words[],
     size_t num_words,
@@ -360,7 +373,7 @@ int main(int argc, char *argv[])
                          (end.tv_usec - start.tv_usec) / 1e6;
 
     // Calculate wpm
-    double nbr_words = (double)text_len / 5;
+    double nbr_words = (double)text_len / 5.0;
     double words_per_minute = nbr_words / elapsed_sec * 60.0;
 
     // Tally successes and fails
@@ -390,7 +403,28 @@ int main(int argc, char *argv[])
     disable_raw_mode(&old);
     free(failed_chars);
 
+    double avg_wpm = average_wpm(stats.successes, stats.fails, stats.total_time);
+    double wpm_diff = words_per_minute - avg_wpm;
+
+    double avg_acc = (double)stats.successes / (double)(stats.successes + stats.fails) * 100.0;
+    double acc_diff = accuracy - avg_acc;
+
     printf("\nDone!\n");
-    printf("Speed: %.1fwpm\n", words_per_minute);
-    printf("Accuracy: %.1f%%\n", accuracy);
+
+    if (wpm_diff < 0)
+    {
+        printf("Speed: %.1fwpm (\033[31m↓%.1fwpm\033[0m)\n", words_per_minute, wpm_diff);
+    }
+    else
+    {
+        printf("Speed: %.1fwpm (\033[32m↑+%.1fwpm\033[0m)\n", words_per_minute, wpm_diff);
+    }
+    if (acc_diff < 0)
+    {
+        printf("Accuracy: %.2f%% (\033[31m↓%.2f%%\033[0m)\n", accuracy, acc_diff);
+    }
+    else
+    {
+        printf("Accuracy: %.2f%% (\033[32m↑+%.2f%%\033[0m)\n", accuracy, acc_diff);
+    }
 }
