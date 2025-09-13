@@ -6,8 +6,8 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define NBR_WORDS 1000    // words to read
-#define MAX_WORD_LEN 100  // maximum length of each word
+#include "parse_words.h"
+
 #define NBR_TEXT_WORDS 10 // words in text
 #define NUM_KEYS 26       // a-z
 #define STATS_FILE_BASE_NAME "stats/"
@@ -162,42 +162,14 @@ void print_stats(const stats *s)
     }
 }
 
-int read_words(const char *filename, char *words[], int max_words)
-{
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
-        perror("Could not open file");
-        return -1;
-    }
-
-    char buffer[MAX_WORD_LEN];
-    int count = 0;
-
-    while (fgets(buffer, sizeof(buffer), fp) && count < max_words)
-    {
-        buffer[strcspn(buffer, "\n")] = '\0'; // remove newline
-        words[count] = strdup(buffer);        // allocate and copy
-        if (!words[count])
-        {
-            perror("Memory allocation failed");
-            break;
-        }
-        count++;
-    }
-
-    fclose(fp);
-    return count;
-}
-
 void build_test_text(
-    char *words[],
+    char **words,
     size_t num_words,
     char *output,
     size_t output_size,
     size_t num_test_words)
 {
-    if (output_size == 0)
+    if (!words || !output || output_size == 0 || num_words == 0)
         return;
 
     size_t current_idx = 0;
@@ -295,9 +267,8 @@ int main(int argc, char *argv[])
 
     int current_idx = 0;
 
-    char *words[NBR_WORDS];
-
-    int word_count = read_words("words.txt", words, NBR_WORDS);
+    char **words = NULL;
+    int word_count = read_words("words.txt", &words);
     if (word_count < 0)
     {
         return 1;
@@ -305,7 +276,7 @@ int main(int argc, char *argv[])
 
     char text[1000];
 
-    build_test_text(words, NBR_WORDS, text, sizeof(text), NBR_TEXT_WORDS);
+    build_test_text(words, word_count, text, sizeof(text), NBR_TEXT_WORDS);
 
     int text_len = strlen(text);
 
