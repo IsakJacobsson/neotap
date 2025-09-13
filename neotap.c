@@ -11,15 +11,16 @@
 #include "parse_words.h"
 #include "stats.h"
 
-int get_terminal_width(void) {
+static int get_terminal_width(void) {
     struct winsize w;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1)
         return 80; // fallback
     return w.ws_col;
 }
 
-int build_test_text(char **words, size_t num_words, char *output,
-                    size_t output_size, size_t num_test_words, int term_width) {
+static int build_test_text(char **words, size_t num_words, char *output,
+                           size_t output_size, size_t num_test_words,
+                           int term_width) {
     if (!words || !output || output_size == 0 || num_words == 0)
         return 0;
 
@@ -30,7 +31,7 @@ int build_test_text(char **words, size_t num_words, char *output,
     for (size_t i = 0; i < num_test_words; i++) {
         int word_idx = rand() % num_words;
         char *word = words[word_idx];
-        size_t word_len = strlen(word);
+        int word_len = strlen(word);
 
         // Truncate word if it's too long for terminal
         if (word_len >= term_width)
@@ -90,7 +91,7 @@ int build_test_text(char **words, size_t num_words, char *output,
 }
 
 // Turn off canonical mode + echo
-void enable_raw_mode(struct termios *old) {
+static void enable_raw_mode(struct termios *old) {
     struct termios new;
     tcgetattr(STDIN_FILENO, old); // get current settings
     new = *old;
@@ -99,12 +100,12 @@ void enable_raw_mode(struct termios *old) {
 }
 
 // Restore original terminal settings
-void disable_raw_mode(struct termios *old) {
+static void disable_raw_mode(struct termios *old) {
     tcsetattr(STDIN_FILENO, TCSANOW, old);
 }
 
-void print_text(const char *text, int *correct_chars, int current_idx,
-                int current_line) {
+static void print_text(const char *text, int *correct_chars, int current_idx,
+                       int current_line) {
     int len = strlen(text);
 
     printf("\033[2K\r"); // Clear line
