@@ -9,115 +9,157 @@
 #define NBR_WORDS 1000    // words to read
 #define MAX_WORD_LEN 100  // maximum length of each word
 #define NBR_TEXT_WORDS 10 // words in text
-#define NUM_KEYS 25       // a to y
-#define KEY_STATS_FILE_BASE_NAME "stats/key_stats"
-#define OVERALL_STATS_FILE_BASE_NAME "stats/overall_stats"
+#define NUM_KEYS 26       // a-z
+#define STATS_FILE_BASE_NAME "stats/"
 
 typedef struct
 {
-    char key;
-    int successes;
-    int fails;
-    double total_time;
-    int attempts;
-} key_stat;
+    int pressed;
+    int correct;
+    double time_spent;
+} key_stats;
 
 typedef struct
 {
-    int successes;
-    int fails;
-    double total_time;
-} overall_stats;
+    int games_played;
+    int total_keystrokes;
+    int correct_keystrokes;
+    double time_spent;
+    double best_wpm;
+} total_stats;
 
-void load_key_stats(const char *filename, key_stat key_stats[])
+typedef struct
 {
-    // initialize defaults first
+    total_stats total;
+    key_stats per_key[NUM_KEYS];
+} stats;
+
+void init_stats(stats *s)
+{
+    s->total.games_played = 0;
+    s->total.total_keystrokes = 0;
+    s->total.correct_keystrokes = 0;
+    s->total.time_spent = 0.0;
+    s->total.best_wpm = 0.0;
+
     for (int i = 0; i < NUM_KEYS; i++)
     {
-        key_stats[i].key = 'a' + i;
-        key_stats[i].successes = 0;
-        key_stats[i].fails = 0;
-        key_stats[i].total_time = 0.0;
-        key_stats[i].attempts = 0;
+        s->per_key[i].pressed = 0;
+        s->per_key[i].correct = 0;
+        s->per_key[i].time_spent = 0.0;
     }
-
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
-        // no file → keep defaults
-        return;
-    }
-
-    char key;
-    int successes, fails;
-    double total_time;
-
-    while (fscanf(fp, " %c %d %d %lf", &key, &successes, &fails, &total_time) == 4)
-    {
-        int idx = key - 'a';
-        key_stats[idx].key = key;
-        key_stats[idx].successes = successes;
-        key_stats[idx].fails = fails;
-        key_stats[idx].total_time = total_time;
-    }
-
-    fclose(fp);
 }
 
-void save_key_stats(const char *filename, key_stat key_stats[])
+void update_key_stats(stats *s, char key_char, int correct, double time_taken)
 {
-    FILE *fp = fopen(filename, "w");
-    if (!fp)
+    if (key_char < 'a' || key_char > 'z')
+        return;
+
+    int index = key_char - 'a';
+    s->per_key[index].pressed += 1;
+    if (correct)
+        s->per_key[index].correct += 1;
+    s->per_key[index].time_spent += time_taken;
+}
+
+void update_total_stats(stats *stats, int total_keystrokes, int correct_keystrokes, double time, double wpm)
+{
+    stats->total.games_played++;
+    stats->total.total_keystrokes += total_keystrokes;
+    stats->total.correct_keystrokes += correct_keystrokes;
+    stats->total.time_spent += time;
+
+    if (wpm > stats->total.best_wpm)
     {
-        perror("Could not open file");
-        exit(1);
+        stats->total.best_wpm = wpm;
     }
+}
+
+double get_key_wpm(key_stats *k)
+{
+    if (k->time_spent > 0)
+        return (k->pressed / 5.0) / (k->time_spent / 60.0);
+    return 0.0;
+}
+
+double get_key_accuracy(key_stats *k)
+{
+    if (k->pressed > 0)
+        return ((double)k->correct / k->pressed) * 100.0;
+    return 0.0;
+}
+
+void save_stats(const char *filename, stats *s)
+{
+    FILE *f = fopen(filename, "wb");
+    if (f)
+    {
+        fwrite(s, sizeof(stats), 1, f);
+        fclose(f);
+    }
+}
+
+int loadStats(const char *filename, stats *s)
+{
+    FILE *f = fopen(filename, "rb");
+    if (f)
+    {
+        fread(s, sizeof(stats), 1, f);
+        fclose(f);
+        return 1;
+    }
+    return 0;
+}
+
+double calc_wpm(int total_chars, double total_time)
+{
+    if (total_time <= 0.0)
+    {
+        return 0.0; // avoid division by zero
+    }
+
+    double words_typed = (double)total_chars / 5.0; // convert chars to "words"
+
+    return words_typed / total_time * 60.0;
+}
+
+double calc_acc(int total_keystrokes, int correct_keystrokes)
+{
+    if (total_keystrokes == 0)
+    {
+        return 0.0; // avoid divide by zero
+    }
+    return ((double)correct_keystrokes / total_keystrokes) * 100.0;
+}
+
+void print_stats(const stats *s)
+{
+    // Print total stats
+    double total_acc = calc_acc(s->total.total_keystrokes, s->total.correct_keystrokes);
+    double total_wpm = calc_wpm(s->total.total_keystrokes, s->total.time_spent);
+
+    printf("==== TOTAL STATS ====\n");
+    printf("Games played: %d\n", s->total.games_played);
+    printf("Total keystrokes: %d\n", s->total.total_keystrokes);
+    printf("Correct keystrokes: %d\n", s->total.correct_keystrokes);
+    printf("Accuracy: %.2f%%\n", total_acc);
+    printf("WPM: %.2f\n", total_wpm);
+    printf("Best WPM: %.2f\n", s->total.best_wpm);
+
+    // Print per-key stats
+    printf("==== PER-KEY STATS ====\n");
     for (int i = 0; i < NUM_KEYS; i++)
     {
-        fprintf(fp, "%c %d %d %lf\n", key_stats[i].key, key_stats[i].successes, key_stats[i].fails, key_stats[i].total_time);
+        const key_stats *k = &s->per_key[i];
+        if (k->pressed > 0)
+        { // only print used keys
+            char key_char = 'a' + i;
+            double acc = calc_acc(k->pressed, k->correct);
+            double wpm = calc_wpm(k->pressed, k->time_spent);
+
+            printf("Key '%c': accuracy=%.2f%%, WPM=%.2f\n", key_char, acc, wpm);
+        }
     }
-    fclose(fp);
-}
-
-void load_overall_stats(const char *filename, overall_stats *stats)
-{
-    // defaults
-    stats->successes = 0;
-    stats->fails = 0;
-    stats->total_time = 0.0;
-
-    FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
-        // no file → keep defaults
-        return;
-    }
-
-    int successes, fails;
-    double total_time;
-
-    if (fscanf(fp, " %d %d %lf", &successes, &fails, &total_time) == 3)
-    {
-        stats->successes = successes;
-        stats->fails = fails;
-        stats->total_time = total_time;
-    }
-
-    fclose(fp);
-}
-
-void save_overall_stats(const char *filename, overall_stats *stats)
-{
-    FILE *fp = fopen(filename, "w");
-    if (!fp)
-    {
-        perror("Could not open file");
-        exit(1);
-    }
-
-    fprintf(fp, "%d %d %lf\n", stats->successes, stats->fails, stats->total_time);
-
-    fclose(fp);
 }
 
 int read_words(const char *filename, char *words[], int max_words)
@@ -146,19 +188,6 @@ int read_words(const char *filename, char *words[], int max_words)
 
     fclose(fp);
     return count;
-}
-
-double average_wpm(int successes, int fails, double total_time)
-{
-    int total_chars = successes + fails;
-    if (total_time <= 0.0)
-    {
-        return 0.0; // avoid division by zero
-    }
-
-    double words_typed = (double)total_chars / 5.0; // convert chars to "words"
-
-    return words_typed / total_time * 60.0;
 }
 
 void build_test_text(
@@ -220,7 +249,7 @@ void disable_raw_mode(struct termios *old)
     tcsetattr(STDIN_FILENO, TCSANOW, old);
 }
 
-void print_text(const char *text, int *failed_chars, int current_idx)
+void print_text(const char *text, int *correct_chars, int current_idx)
 {
     int len = strlen(text);
 
@@ -230,7 +259,7 @@ void print_text(const char *text, int *failed_chars, int current_idx)
     {
         if (i < current_idx)
         {
-            if (failed_chars[i])
+            if (!correct_chars[i])
             {
                 // Red for failed char, underscore if it was a space
                 if (text[i] == ' ')
@@ -285,24 +314,28 @@ int main(int argc, char *argv[])
     enable_raw_mode(&old);
 
     // Keep track of the failed chars
-    int *failed_chars = calloc(text_len, sizeof(int));
-    if (!failed_chars)
+    int *correct_chars = calloc(text_len, sizeof(int));
+    if (!correct_chars)
     {
         perror("calloc failed");
         return 1;
     }
+    for (int i = 0; i < text_len; i++)
+    {
+        correct_chars[i] = 1; // initialize with 1
+    }
 
-    // Read stats
-    key_stat key_stats[NUM_KEYS];
-    overall_stats stats;
-    char key_stats_file[256];
-    snprintf(key_stats_file, sizeof(key_stats_file), "%s_%s.txt",
-             KEY_STATS_FILE_BASE_NAME, player_name);
-    char overall_stats_file[256];
-    snprintf(overall_stats_file, sizeof(key_stats_file), "%s_%s.txt",
-             OVERALL_STATS_FILE_BASE_NAME, player_name);
-    load_key_stats(key_stats_file, key_stats);
-    load_overall_stats(overall_stats_file, &stats);
+    stats stats;
+
+    char stats_file[256];
+    snprintf(stats_file, sizeof(stats_file), "%s%s.dat",
+             STATS_FILE_BASE_NAME, player_name);
+
+    // Load or initialize stats
+    if (!loadStats(stats_file, &stats))
+    {
+        init_stats(&stats);
+    }
 
     // Count down
     printf("\033[?25l"); // hide cursor
@@ -342,18 +375,8 @@ int main(int argc, char *argv[])
                                          (key_timer_end.tv_usec - key_timer_start.tv_usec) / 1e6;
 
             // Add success or fail for key
-            if (input != ' ') // We don't keep track of space key stats
-            {
-                if (failed_chars[current_idx] == 0)
-                {
-                    key_stats[input - 'a'].successes++;
-                }
-                else
-                {
-                    key_stats[input - 'a'].fails++;
-                }
-                key_stats[input - 'a'].total_time += elapsed_sec_for_key;
-            }
+            update_key_stats(&stats, input, correct_chars[current_idx], elapsed_sec_for_key);
+
             current_idx++;
 
             // Start timer for next key
@@ -361,70 +384,69 @@ int main(int argc, char *argv[])
         }
         else
         {
-            failed_chars[current_idx] = 1;
+            correct_chars[current_idx] = 0;
         }
 
-        print_text(text, failed_chars, current_idx);
+        print_text(text, correct_chars, current_idx);
     }
 
     // Stop timer
     gettimeofday(&end, NULL);
-    double elapsed_sec = (end.tv_sec - start.tv_sec) +
-                         (end.tv_usec - start.tv_usec) / 1e6;
+    double game_elapsed_sec = (end.tv_sec - start.tv_sec) +
+                              (end.tv_usec - start.tv_usec) / 1e6;
 
     // Calculate wpm
-    double nbr_words = (double)text_len / 5.0;
-    double words_per_minute = nbr_words / elapsed_sec * 60.0;
+    double game_wpm = calc_wpm(text_len, game_elapsed_sec);
 
     // Tally successes and fails
     int nbr_successes = 0;
-    int nbr_fails = 0;
     for (int i = 0; i < text_len; i++)
     {
-        if (failed_chars[i] == 1)
-        {
-            nbr_fails++;
-        }
-        else
+        if (correct_chars[i] == 1)
         {
             nbr_successes++;
         }
     }
 
-    // Save stats
-    stats.successes += nbr_successes;
-    stats.fails += nbr_fails;
-    stats.total_time += elapsed_sec;
-    save_overall_stats(overall_stats_file, &stats);
-    save_key_stats(key_stats_file, key_stats);
-
-    double accuracy = (double)(nbr_successes) / (double)text_len * 100.0;
-
     disable_raw_mode(&old);
-    free(failed_chars);
+    free(correct_chars);
 
-    double avg_wpm = average_wpm(stats.successes, stats.fails, stats.total_time);
-    double wpm_diff = words_per_minute - avg_wpm;
+    double game_acc = calc_acc(text_len, nbr_successes);
 
-    double avg_acc = (double)stats.successes / (double)(stats.successes + stats.fails) * 100.0;
-    double acc_diff = accuracy - avg_acc;
+    if (game_wpm > stats.total.best_wpm)
+    {
+        printf("\nDone! New record!\n");
+    }
+    else
+    {
+        printf("\nDone!\n");
+    }
 
-    printf("\nDone!\n");
+    update_total_stats(&stats, text_len, nbr_successes, game_elapsed_sec, game_wpm);
+    save_stats(stats_file, &stats);
+
+    double avg_wpm = calc_wpm(stats.total.total_keystrokes, stats.total.time_spent);
+    double wpm_diff = game_wpm - avg_wpm;
+
+    double avg_acc = calc_acc(stats.total.total_keystrokes, stats.total.correct_keystrokes);
+    double acc_diff = game_acc - avg_acc;
 
     if (wpm_diff < 0)
     {
-        printf("Speed: %.1fwpm (\033[31m↓%.1fwpm\033[0m)\n", words_per_minute, wpm_diff);
+        printf("Speed: %.1fwpm (\033[31m↓%.1fwpm\033[0m)\n", game_wpm, wpm_diff);
     }
     else
     {
-        printf("Speed: %.1fwpm (\033[32m↑+%.1fwpm\033[0m)\n", words_per_minute, wpm_diff);
+        printf("Speed: %.1fwpm (\033[32m↑+%.1fwpm\033[0m)\n", game_wpm, wpm_diff);
     }
     if (acc_diff < 0)
     {
-        printf("Accuracy: %.2f%% (\033[31m↓%.2f%%\033[0m)\n", accuracy, acc_diff);
+        printf("Accuracy: %.2f%% (\033[31m↓%.2f%%\033[0m)\n", game_acc, acc_diff);
     }
     else
     {
-        printf("Accuracy: %.2f%% (\033[32m↑+%.2f%%\033[0m)\n", accuracy, acc_diff);
+        printf("Accuracy: %.2f%% (\033[32m↑+%.2f%%\033[0m)\n", game_acc, acc_diff);
     }
+
+    print_stats(&stats);
 }
