@@ -5,23 +5,35 @@
 #include <termios.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 
 #include "parse_words.h"
 #include "stats.h"
 
-#define NBR_TEXT_WORDS 10 // words in text
+#define NBR_TEXT_WORDS 20 // words in text
 
-void build_test_text(
+int get_terminal_width(void)
+{
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1)
+        return 80; // fallback
+    return w.ws_col;
+}
+
+int build_test_text(
     char **words,
     size_t num_words,
     char *output,
     size_t output_size,
-    size_t num_test_words)
+    size_t num_test_words,
+    int term_width)
 {
     if (!words || !output || output_size == 0 || num_words == 0)
-        return;
+        return 0;
 
     size_t current_idx = 0;
+    int col = 0;       // current column in the terminal
+    int nbr_lines = 1; // start with first line
 
     for (size_t i = 0; i < num_test_words; i++)
     {
@@ -29,29 +41,68 @@ void build_test_text(
         char *word = words[word_idx];
         size_t word_len = strlen(word);
 
-        // Check if the word fits in the remaining buffer (including space or null)
-        size_t space_needed = word_len;
-        if (i > 0)
-            space_needed += 1; // space before word if not first
+        // Truncate word if it's too long for terminal
+        if (word_len >= term_width)
+            word_len = term_width - 1;
 
-        if (current_idx + space_needed >= output_size)
-        {
-            break; // not enough space
-        }
-
-        // Add space if not the first word
+        // Add space if not first word
         if (i > 0)
         {
-            output[current_idx++] = ' ';
+            // Wrap to new line if space + word exceeds terminal width
+            if (col + 1 + word_len >= term_width)
+            {
+                // Ensure we have space for newline
+                if (current_idx + 1 >= output_size)
+                    break;
+
+                // Add a space at the end of the line
+                if (col < term_width && current_idx < output_size)
+                {
+                    output[current_idx++] = ' ';
+                }
+
+                output[current_idx++] = '\n';
+                col = 0;
+                nbr_lines++;
+            }
+            else
+            {
+                if (current_idx + 1 >= output_size)
+                    break;
+                output[current_idx++] = ' ';
+                col += 1;
+            }
         }
+
+        // Check buffer space
+        if (current_idx + word_len >= output_size)
+            break;
 
         // Copy the word
         memcpy(&output[current_idx], word, word_len);
         current_idx += word_len;
+        col += word_len;
+
+        // Wrap if word reaches terminal width exactly
+        if (col >= term_width)
+        {
+            if (current_idx + 1 < output_size)
+            {
+                output[current_idx++] = ' ';
+                output[current_idx++] = '\n';
+                col = 0;
+                nbr_lines++;
+            }
+        }
     }
 
     // Null-terminate
-    output[current_idx] = '\0';
+    if (current_idx < output_size)
+        output[current_idx] = '\0';
+    else
+        output[output_size - 1] = '\0';
+
+    return nbr_lines;
 }
 
 // Turn off canonical mode + echo
@@ -70,11 +121,17 @@ void disable_raw_mode(struct termios *old)
     tcsetattr(STDIN_FILENO, TCSANOW, old);
 }
 
-void print_text(const char *text, int *correct_chars, int current_idx)
+void print_text(const char *text, int *correct_chars, int current_idx, int current_line)
 {
     int len = strlen(text);
 
-    printf("\033[2K\r"); // Clear the current line
+    printf("\033[2K\r"); // Clear line
+
+    for (int i = 0; i < current_line - 1; i++)
+    {
+        printf("\033[1A");   // move cursor up
+        printf("\033[2K\r"); // Clear line
+    }
 
     for (int i = 0; i < len; i++)
     {
@@ -114,8 +171,6 @@ int main(int argc, char *argv[])
     // Seed the random generator
     srand(time(NULL));
 
-    int current_idx = 0;
-
     char **words = NULL;
     int word_count = read_words("words.txt", &words);
     if (word_count < 0)
@@ -125,7 +180,10 @@ int main(int argc, char *argv[])
 
     char text[1000];
 
-    build_test_text(words, word_count, text, sizeof(text), NBR_TEXT_WORDS);
+    int nbr_lines = build_test_text(words, word_count, text, sizeof(text), NBR_TEXT_WORDS, get_terminal_width());
+    int current_line = 1;
+    int current_idx = 0;
+    int col = 0;
 
     int text_len = strlen(text);
 
@@ -160,14 +218,18 @@ int main(int argc, char *argv[])
         printf("Game starts in: %d\n\033[90m%s\033[0m", i, text); // print the text in gray
         fflush(stdout);
         usleep(1000000);
-        printf("\033[2K\r"); // clear text line
-        printf("\033[1A");   // move cursor up
+        for (int i = 0; i < nbr_lines; i++)
+        {
+            printf("\033[2K\r"); // clear text line
+            printf("\033[1A");   // move cursor up
+        }
         printf("\033[2K\r"); // clear counter line
     }
     printf("\033[?25h"); // show cursor again
 
     // Initial display
     printf("GO!\n%s", text);
+    tcflush(STDIN_FILENO, TCIFLUSH); // Clear pending input
 
     // Start timer
     struct timeval start, end, key_timer_start, key_timer_end;
@@ -176,11 +238,24 @@ int main(int argc, char *argv[])
 
     while (current_idx < text_len)
     {
-        // Move cursor to current position
-        printf("\033[%dG", current_idx + 1);
+        // Continue on line break
+        if (text[current_idx] == '\n')
+        {
+            current_line++;
+            col = 0; // for cursor position
+            current_idx++;
+            continue;
+        }
+
+        // Move cursor to correct line
+        for (int i = 0; i < nbr_lines - current_line; i++)
+        {
+            printf("\033[1A");
+        }
+        // Move cursor to currect col
+        printf("\033[%dG", col + 1);
 
         // Read input
-        tcflush(STDIN_FILENO, TCIFLUSH); // Clear pending input
         char input;
         scanf("%c", &input);
 
@@ -196,13 +271,14 @@ int main(int argc, char *argv[])
             update_key_stats(&stats, input, correct_chars[current_idx], elapsed_sec_for_key);
 
             current_idx++;
+            col++;
         }
         else
         {
             correct_chars[current_idx] = 0;
         }
 
-        print_text(text, correct_chars, current_idx);
+        print_text(text, correct_chars, current_idx, current_line);
     }
 
     // Stop timer
