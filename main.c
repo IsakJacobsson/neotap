@@ -186,17 +186,16 @@ int main(int argc, char *argv[])
 
         if (input == text[current_idx])
         {
+            // Stop and start new key timer
             gettimeofday(&key_timer_end, NULL);
             double elapsed_sec_for_key = (key_timer_end.tv_sec - key_timer_start.tv_sec) +
                                          (key_timer_end.tv_usec - key_timer_start.tv_usec) / 1e6;
+            gettimeofday(&key_timer_start, NULL);
 
             // Add success or fail for key
             update_key_stats(&stats, input, correct_chars[current_idx], elapsed_sec_for_key);
 
             current_idx++;
-
-            // Start timer for next key
-            gettimeofday(&key_timer_start, NULL);
         }
         else
         {
