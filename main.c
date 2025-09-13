@@ -7,10 +7,9 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 
+#include "parse_args.h"
 #include "parse_words.h"
 #include "stats.h"
-
-#define NBR_TEXT_WORDS 20 // words in text
 
 int get_terminal_width(void)
 {
@@ -161,12 +160,9 @@ void print_text(const char *text, int *correct_chars, int current_idx, int curre
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
-    {
-        printf("Usage: %s <player_name>\n", argv[0]);
+    args args;
+    if (parse_arguments(argc, argv, &args) != 0)
         return 1;
-    }
-    const char *player_name = argv[1];
 
     // Seed the random generator
     srand(time(NULL));
@@ -180,7 +176,7 @@ int main(int argc, char *argv[])
 
     char text[1000];
 
-    int nbr_lines = build_test_text(words, word_count, text, sizeof(text), NBR_TEXT_WORDS, get_terminal_width());
+    int nbr_lines = build_test_text(words, word_count, text, sizeof(text), args.num_words, get_terminal_width());
     int current_line = 1;
     int current_idx = 0;
     int col = 0;
@@ -206,7 +202,7 @@ int main(int argc, char *argv[])
     stats stats;
 
     // Load or initialize stats
-    if (!load_stats(player_name, &stats))
+    if (!load_stats(args.player_name, &stats))
     {
         init_stats(&stats);
     }
@@ -314,7 +310,7 @@ int main(int argc, char *argv[])
     }
 
     update_total_stats(&stats, text_len, correct_keystrokes, game_elapsed_sec, game_wpm);
-    save_stats(player_name, &stats);
+    save_stats(args.player_name, &stats);
 
     double avg_wpm = calc_wpm(stats.total.total_keystrokes, stats.total.time_spent);
     double wpm_diff = game_wpm - avg_wpm;
