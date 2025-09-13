@@ -191,16 +191,16 @@ int main(int argc, char *argv[])
     struct termios old;
     enable_raw_mode(&old);
 
-    // Keep track of the failed chars
-    int *correct_chars = calloc(text_len, sizeof(int));
-    if (!correct_chars)
+    // Keep track of correct keystrokes for text
+    int *correct_keystrokes_list = calloc(text_len, sizeof(int));
+    if (!correct_keystrokes_list)
     {
         perror("calloc failed");
         return 1;
     }
     for (int i = 0; i < text_len; i++)
     {
-        correct_chars[i] = 1; // initialize with 1
+        correct_keystrokes_list[i] = 1; // initialize with 1
     }
 
     stats stats;
@@ -247,12 +247,12 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        // Move cursor to correct line
+        // Move cursor to current line
         for (int i = 0; i < nbr_lines - current_line; i++)
         {
             printf("\033[1A");
         }
-        // Move cursor to currect col
+        // Move cursor to current col
         printf("\033[%dG", col + 1);
 
         // Read input
@@ -268,17 +268,17 @@ int main(int argc, char *argv[])
             gettimeofday(&key_timer_start, NULL);
 
             // Add success or fail for key
-            update_key_stats(&stats, input, correct_chars[current_idx], elapsed_sec_for_key);
+            update_key_stats(&stats, input, correct_keystrokes_list[current_idx], elapsed_sec_for_key);
 
             current_idx++;
             col++;
         }
         else
         {
-            correct_chars[current_idx] = 0;
+            correct_keystrokes_list[current_idx] = 0;
         }
 
-        print_text(text, correct_chars, current_idx, current_line);
+        print_text(text, correct_keystrokes_list, current_idx, current_line);
     }
 
     // Stop timer
@@ -289,20 +289,20 @@ int main(int argc, char *argv[])
     // Calculate wpm
     double game_wpm = calc_wpm(text_len, game_elapsed_sec);
 
-    // Tally successes and fails
-    int nbr_successes = 0;
+    // Sum correct keystrokes
+    int correct_keystrokes = 0;
     for (int i = 0; i < text_len; i++)
     {
-        if (correct_chars[i] == 1)
+        if (correct_keystrokes_list[i] == 1)
         {
-            nbr_successes++;
+            correct_keystrokes++;
         }
     }
 
     disable_raw_mode(&old);
-    free(correct_chars);
+    free(correct_keystrokes_list);
 
-    double game_acc = calc_acc(text_len, nbr_successes);
+    double game_acc = calc_acc(text_len, correct_keystrokes);
 
     if (game_wpm > stats.total.best_wpm)
     {
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
         printf("\nDone!\n");
     }
 
-    update_total_stats(&stats, text_len, nbr_successes, game_elapsed_sec, game_wpm);
+    update_total_stats(&stats, text_len, correct_keystrokes, game_elapsed_sec, game_wpm);
     save_stats(player_name, &stats);
 
     double avg_wpm = calc_wpm(stats.total.total_keystrokes, stats.total.time_spent);
