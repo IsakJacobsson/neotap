@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "stats.h"
@@ -13,6 +14,7 @@ void init_stats(stats *s) {
     s->total.best_wpm = 0.0;
 
     for (int i = 0; i < NUM_KEYS; i++) {
+        s->per_key[i].key = 'a' + i;
         s->per_key[i].pressed = 0;
         s->per_key[i].correct = 0;
         s->per_key[i].time_spent = 0.0;
@@ -24,9 +26,12 @@ void update_key_stats(stats *s, char key_char, int correct, double time_taken) {
         return;
 
     int index = key_char - 'a';
-    s->per_key[index].pressed += 1;
-    if (correct)
-        s->per_key[index].correct += 1;
+    if (s->per_key[index].pressed < 1000) {
+        double wpm = calc_wpm(1, time_taken);
+        s->per_key[index].wpm_history[s->per_key[index].pressed] = wpm;
+    }
+    s->per_key[index].pressed++;
+    s->per_key[index].correct += correct;
     s->per_key[index].time_spent += time_taken;
 }
 
@@ -65,30 +70,121 @@ void merge_stats(stats *dest, const stats *src) {
     }
 }
 
-void save_stats(const char *player_name, stats *s) {
-    char stats_file[256];
-    snprintf(stats_file, sizeof(stats_file), "%s%s.dat", STATS_FILE_BASE_NAME,
-             player_name);
+static int file_exists(const char *filename) {
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
+}
 
-    FILE *f = fopen(stats_file, "wb");
-    if (f) {
-        fwrite(s, sizeof(stats), 1, f);
-        fclose(f);
+void save_game_history(const char *player_name, stats *s) {
+    char keys_csvfile[256];
+    snprintf(keys_csvfile, sizeof(keys_csvfile), "%s%s.keyspeed.csv",
+             STATS_FILE_BASE_NAME, player_name);
+
+    int keys_file_exists = file_exists(keys_csvfile);
+    FILE *keys_csv = fopen(keys_csvfile, "a");
+    if (!keys_csv) {
+        perror("fopen");
+        return;
     }
+
+    // Write header if file didn't exist
+    if (!keys_file_exists) {
+        fprintf(keys_csv, "date,key,wpm\n");
+    }
+
+    // get current date+time
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char datetimebuf[20]; // "YYYY-MM-DD HH:MM:SS"
+    strftime(datetimebuf, sizeof(datetimebuf), "%Y-%m-%d %H:%M:%S", t);
+
+    for (int i = 0; i < NUM_KEYS; i++) {
+        for (int j = 0; j < s->per_key[i].pressed; j++) {
+            fprintf(keys_csv, "%s,%c,%.4f\n", datetimebuf, s->per_key[i].key,
+                    s->per_key[i].wpm_history[j]);
+        }
+    }
+
+    fclose(keys_csv);
+
+    char game_csvfile[256];
+    snprintf(game_csvfile, sizeof(game_csvfile), "%s%s.game-history.csv",
+             STATS_FILE_BASE_NAME, player_name);
+
+    int game_file_exists = file_exists(game_csvfile);
+    FILE *game_csv = fopen(game_csvfile, "a");
+    if (!game_csv) {
+        perror("fopen");
+        return;
+    }
+
+    // Write header if file didn't exist
+    if (!game_file_exists) {
+        fprintf(game_csv, "date,wpm,acc\n");
+    }
+
+    double wpm = calc_wpm(s->total.total_keystrokes, s->total.time_spent);
+    double acc =
+        calc_acc(s->total.total_keystrokes, s->total.correct_keystrokes);
+    fprintf(game_csv, "%s,%.4f,%.4f\n", datetimebuf, wpm, acc);
+
+    fclose(game_csv);
+}
+
+void save_stats(const char *player_name, stats *s) {
+    char filename[256];
+    snprintf(filename, sizeof(filename), "%s%s.overall.txt",
+             STATS_FILE_BASE_NAME, player_name);
+
+    FILE *f = fopen(filename, "w");
+    if (!f) {
+        return;
+    }
+
+    // Save total stats
+    fprintf(f, "games_played %d\n", s->total.games_played);
+    fprintf(f, "total_keystrokes %d\n", s->total.total_keystrokes);
+    fprintf(f, "correct_keystrokes %d\n", s->total.correct_keystrokes);
+    fprintf(f, "time_spent %lf\n", s->total.time_spent);
+    fprintf(f, "best_wpm %lf\n", s->total.best_wpm);
+
+    // Save per-key stats
+    for (int i = 0; i < NUM_KEYS; i++) {
+        const key_stats *k = &s->per_key[i];
+        fprintf(f, "key %c pressed %d correct %d time_spent %lf\n", k->key,
+                k->pressed, k->correct, k->time_spent);
+    }
+
+    fclose(f);
 }
 
 int load_stats(const char *player_name, stats *s) {
-    char stats_file[256];
-    snprintf(stats_file, sizeof(stats_file), "%s%s.dat", STATS_FILE_BASE_NAME,
-             player_name);
+    char filename[256];
+    snprintf(filename, sizeof(filename), "%s%s.overall.txt",
+             STATS_FILE_BASE_NAME, player_name);
 
-    FILE *f = fopen(stats_file, "rb");
-    if (f) {
-        fread(s, sizeof(stats), 1, f);
-        fclose(f);
-        return 1;
+    FILE *f = fopen(filename, "r");
+    if (!f) {
+        return 0;
     }
-    return 0;
+
+    // Load total stats
+    fscanf(f, "games_played %d\n", &s->total.games_played);
+    fscanf(f, "total_keystrokes %d\n", &s->total.total_keystrokes);
+    fscanf(f, "correct_keystrokes %d\n", &s->total.correct_keystrokes);
+    fscanf(f, "time_spent %lf\n", &s->total.time_spent);
+    fscanf(f, "best_wpm %lf\n", &s->total.best_wpm);
+
+    // Load per-key stats
+    for (int i = 0; i < NUM_KEYS; i++) {
+        key_stats *k = &s->per_key[i];
+        fscanf(f, "key %c pressed %d correct %d time_spent %lf\n", &k->key,
+               &k->pressed, &k->correct, &k->time_spent);
+    }
+
+    fclose(f);
+
+    return 1;
 }
 
 void print_stats(const stats *s) {

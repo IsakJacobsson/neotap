@@ -277,6 +277,7 @@ int main(int argc, char *argv[]) {
     // Add game stats to the player
     merge_stats(&player_stats, &game_stats);
 
+    save_game_history(args.player_name, &game_stats);
     save_stats(args.player_name, &player_stats);
 
     double avg_wpm = calc_wpm(player_stats.total.total_keystrokes,
