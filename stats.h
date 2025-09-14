@@ -7,8 +7,9 @@ typedef struct {
     int pressed;
     int correct;
     double time_spent;
-    double wpm_history[1000];
-    int acc_history[1000];
+    double *wpm_history;
+    int *acc_history;
+    int history_len;
 } key_stats;
 
 typedef struct {

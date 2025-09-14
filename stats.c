@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -18,7 +20,35 @@ void init_stats(stats *s) {
         s->per_key[i].pressed = 0;
         s->per_key[i].correct = 0;
         s->per_key[i].time_spent = 0.0;
+        s->per_key[i].history_len = 16; // Should grow dynamically if needed
+
+        // Allocate initial history arrays
+        s->per_key[i].wpm_history =
+            malloc(sizeof(double) * s->per_key[i].history_len);
+        s->per_key[i].acc_history =
+            malloc(sizeof(int) * s->per_key[i].history_len);
+
+        // zero-initialize
+        if (s->per_key[i].wpm_history)
+            memset(s->per_key[i].wpm_history, 0,
+                   sizeof(double) * s->per_key[i].history_len);
+        if (s->per_key[i].acc_history)
+            memset(s->per_key[i].acc_history, 0,
+                   sizeof(int) * s->per_key[i].history_len);
     }
+}
+
+// Append to dynamic array, grow if needed
+static void append_history(key_stats *k, double wpm, int correct) {
+    if (k->pressed >= k->history_len) {
+        // Grow by 2x
+        k->history_len *= 2;
+        k->wpm_history =
+            realloc(k->wpm_history, sizeof(double) * k->history_len);
+        k->acc_history = realloc(k->acc_history, sizeof(int) * k->history_len);
+    }
+    k->wpm_history[k->pressed] = wpm;
+    k->acc_history[k->pressed] = correct;
 }
 
 void update_key_stats(stats *s, char key_char, int correct, double time_taken) {
@@ -26,11 +56,9 @@ void update_key_stats(stats *s, char key_char, int correct, double time_taken) {
         return;
 
     int index = key_char - 'a';
-    if (s->per_key[index].pressed < 1000) {
-        double wpm = calc_wpm(1, time_taken);
-        s->per_key[index].wpm_history[s->per_key[index].pressed] = wpm;
-        s->per_key[index].acc_history[s->per_key[index].pressed] = correct;
-    }
+
+    double wpm = calc_wpm(1, time_taken);
+    append_history(&s->per_key[index], wpm, correct);
 
     s->per_key[index].pressed++;
     s->per_key[index].correct += correct;
