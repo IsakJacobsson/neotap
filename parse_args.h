@@ -2,8 +2,7 @@
 #include <stdbool.h>
 
 // Struct to hold parsed arguments
-typedef struct
-{
+typedef struct {
     char *player_name;
     int num_words;
 } args;

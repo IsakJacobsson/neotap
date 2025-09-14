@@ -6,11 +6,9 @@
 
 #define MAX_WORD_LEN 100 // maximum length of each word
 
-int read_words(const char *filename, char ***words_out)
-{
+int read_words(const char *filename, char ***words_out) {
     FILE *fp = fopen(filename, "r");
-    if (!fp)
-    {
+    if (!fp) {
         perror("Could not open file");
         return -1;
     }
@@ -19,23 +17,19 @@ int read_words(const char *filename, char ***words_out)
     int count = 0;
     int capacity = 10; // initial size
     char **words = malloc(capacity * sizeof(char *));
-    if (!words)
-    {
+    if (!words) {
         perror("malloc failed");
         fclose(fp);
         return -1;
     }
 
-    while (fgets(buffer, sizeof(buffer), fp))
-    {
+    while (fgets(buffer, sizeof(buffer), fp)) {
         buffer[strcspn(buffer, "\n")] = '\0'; // remove newline
 
-        if (count >= capacity)
-        {
+        if (count >= capacity) {
             capacity *= 2;
             char **tmp = realloc(words, capacity * sizeof(char *));
-            if (!tmp)
-            {
+            if (!tmp) {
                 perror("realloc failed");
                 // free already allocated strings
                 for (int i = 0; i < count; i++)
@@ -48,8 +42,7 @@ int read_words(const char *filename, char ***words_out)
         }
 
         words[count] = strdup(buffer); // allocate + copy
-        if (!words[count])
-        {
+        if (!words[count]) {
             perror("strdup failed");
             // cleanup
             for (int i = 0; i < count; i++)

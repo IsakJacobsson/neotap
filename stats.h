@@ -2,15 +2,13 @@
 
 #define NUM_KEYS 26 // a-z
 
-typedef struct
-{
+typedef struct {
     int pressed;
     int correct;
     double time_spent;
 } key_stats;
 
-typedef struct
-{
+typedef struct {
     int games_played;
     int total_keystrokes;
     int correct_keystrokes;
@@ -18,8 +16,7 @@ typedef struct
     double best_wpm;
 } total_stats;
 
-typedef struct
-{
+typedef struct {
     total_stats total;
     key_stats per_key[NUM_KEYS];
 } stats;
@@ -28,7 +25,8 @@ void init_stats(stats *s);
 
 void update_key_stats(stats *s, char key_char, int correct, double time_taken);
 
-void update_total_stats(stats *stats, int total_keystrokes, int correct_keystrokes, double time, double wpm);
+void update_total_stats(stats *stats, int total_keystrokes,
+                        int correct_keystrokes, double time, double wpm);
 
 double get_key_wpm(key_stats *k);
 

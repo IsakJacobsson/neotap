@@ -1,14 +1,13 @@
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
 
 #include "parse_args.h"
 
 #define DEFAULT_NUM_WORDS 10
 
-int parse_arguments(int argc, char *argv[], args *args)
-{
+int parse_arguments(int argc, char *argv[], args *args) {
     if (!args)
         return -1;
 
@@ -25,10 +24,9 @@ int parse_arguments(int argc, char *argv[], args *args)
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long(argc, argv, "p:w:", long_options, &option_index)) != -1)
-    {
-        switch (opt)
-        {
+    while ((opt = getopt_long(argc, argv, "p:w:", long_options,
+                              &option_index)) != -1) {
+        switch (opt) {
         case 'p':
             args->player_name = optarg; // string
             break;
@@ -36,15 +34,18 @@ int parse_arguments(int argc, char *argv[], args *args)
             args->num_words = atoi(optarg); // convert to int
             break;
         default:
-            fprintf(stderr, "Usage: %s -p <player> [-w <num-words>]\n", argv[0]);
+            fprintf(stderr, "Usage: %s -p <player> [-w <num-words>]\n",
+                    argv[0]);
             return -1;
         }
     }
 
     // Check required arguments
-    if (!args->player_name)
-    {
-        fprintf(stderr, "Missing required argument -p <player>\nUsage: %s -p <player> [-w <num-words>]\n", argv[0]);
+    if (!args->player_name) {
+        fprintf(stderr,
+                "Missing required argument -p <player>\nUsage: %s -p <player> "
+                "[-w <num-words>]\n",
+                argv[0]);
         return -1;
     }
 
