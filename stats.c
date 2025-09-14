@@ -29,7 +29,9 @@ void update_key_stats(stats *s, char key_char, int correct, double time_taken) {
     if (s->per_key[index].pressed < 1000) {
         double wpm = calc_wpm(1, time_taken);
         s->per_key[index].wpm_history[s->per_key[index].pressed] = wpm;
+        s->per_key[index].acc_history[s->per_key[index].pressed] = correct;
     }
+
     s->per_key[index].pressed++;
     s->per_key[index].correct += correct;
     s->per_key[index].time_spent += time_taken;
@@ -75,60 +77,54 @@ static int file_exists(const char *filename) {
     return (stat(filename, &buffer) == 0);
 }
 
-void save_game_history(const char *player_name, stats *s) {
-    char keys_csvfile[256];
-    snprintf(keys_csvfile, sizeof(keys_csvfile), "%s%s.keyspeed.csv",
-             STATS_FILE_BASE_NAME, player_name);
-
-    int keys_file_exists = file_exists(keys_csvfile);
-    FILE *keys_csv = fopen(keys_csvfile, "a");
-    if (!keys_csv) {
+static FILE *open_csv_with_header(const char *filename, const char *header) {
+    int exists = file_exists(filename);
+    FILE *f = fopen(filename, "a");
+    if (!f) {
         perror("fopen");
-        return;
+        return NULL;
     }
-
-    // Write header if file didn't exist
-    if (!keys_file_exists) {
-        fprintf(keys_csv, "date,key,wpm\n");
+    if (!exists) {
+        fprintf(f, "%s\n", header);
     }
+    return f;
+}
 
-    // get current date+time
+void save_game_history(const char *player_name, stats *s) {
+    // Get current timestamp
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char datetimebuf[20]; // "YYYY-MM-DD HH:MM:SS"
     strftime(datetimebuf, sizeof(datetimebuf), "%Y-%m-%d %H:%M:%S", t);
 
-    for (int i = 0; i < NUM_KEYS; i++) {
-        for (int j = 0; j < s->per_key[i].pressed; j++) {
-            fprintf(keys_csv, "%s,%c,%.4f\n", datetimebuf, s->per_key[i].key,
-                    s->per_key[i].wpm_history[j]);
+    // Save key-level history
+    char keys_csvfile[256];
+    snprintf(keys_csvfile, sizeof(keys_csvfile), "%s%s.key-history.csv",
+             STATS_FILE_BASE_NAME, player_name);
+    FILE *keys_csv = open_csv_with_header(keys_csvfile, "date,key,wpm,acc");
+    if (keys_csv) {
+        for (int i = 0; i < NUM_KEYS; i++) {
+            for (int j = 0; j < s->per_key[i].pressed; j++) {
+                fprintf(keys_csv, "%s,%c,%.6f,%d\n", datetimebuf,
+                        s->per_key[i].key, s->per_key[i].wpm_history[j],
+                        s->per_key[i].acc_history[j]);
+            }
         }
+        fclose(keys_csv);
     }
 
-    fclose(keys_csv);
-
+    // Save game-level summary
     char game_csvfile[256];
     snprintf(game_csvfile, sizeof(game_csvfile), "%s%s.game-history.csv",
              STATS_FILE_BASE_NAME, player_name);
-
-    int game_file_exists = file_exists(game_csvfile);
-    FILE *game_csv = fopen(game_csvfile, "a");
-    if (!game_csv) {
-        perror("fopen");
-        return;
+    FILE *game_csv = open_csv_with_header(game_csvfile, "date,wpm,acc");
+    if (game_csv) {
+        double wpm = calc_wpm(s->total.total_keystrokes, s->total.time_spent);
+        double acc =
+            calc_acc(s->total.total_keystrokes, s->total.correct_keystrokes);
+        fprintf(game_csv, "%s,%.6f,%.6f\n", datetimebuf, wpm, acc);
+        fclose(game_csv);
     }
-
-    // Write header if file didn't exist
-    if (!game_file_exists) {
-        fprintf(game_csv, "date,wpm,acc\n");
-    }
-
-    double wpm = calc_wpm(s->total.total_keystrokes, s->total.time_spent);
-    double acc =
-        calc_acc(s->total.total_keystrokes, s->total.correct_keystrokes);
-    fprintf(game_csv, "%s,%.4f,%.4f\n", datetimebuf, wpm, acc);
-
-    fclose(game_csv);
 }
 
 void save_stats(const char *player_name, stats *s) {
