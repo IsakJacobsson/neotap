@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 
 #include "stats.h"
 
@@ -38,6 +39,29 @@ void update_total_stats(stats *stats, int total_keystrokes,
 
     if (wpm > stats->total.best_wpm) {
         stats->total.best_wpm = wpm;
+    }
+}
+
+void merge_stats(stats *dest, const stats *src) {
+    if (!dest || !src)
+        return;
+
+    // Merge totals
+    dest->total.games_played += src->total.games_played;
+    dest->total.total_keystrokes += src->total.total_keystrokes;
+    dest->total.correct_keystrokes += src->total.correct_keystrokes;
+    dest->total.time_spent += src->total.time_spent;
+
+    // Best WPM: keep the higher one
+    if (src->total.best_wpm > dest->total.best_wpm) {
+        dest->total.best_wpm = src->total.best_wpm;
+    }
+
+    // Merge per-key stats
+    for (int i = 0; i < NUM_KEYS; i++) {
+        dest->per_key[i].pressed += src->per_key[i].pressed;
+        dest->per_key[i].correct += src->per_key[i].correct;
+        dest->per_key[i].time_spent += src->per_key[i].time_spent;
     }
 }
 

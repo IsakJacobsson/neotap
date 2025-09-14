@@ -28,6 +28,8 @@ void update_key_stats(stats *s, char key_char, int correct, double time_taken);
 void update_total_stats(stats *stats, int total_keystrokes,
                         int correct_keystrokes, double time, double wpm);
 
+void merge_stats(stats *dest, const stats *src);
+
 double get_key_wpm(key_stats *k);
 
 double get_key_accuracy(key_stats *k);

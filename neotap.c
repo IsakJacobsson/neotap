@@ -172,12 +172,9 @@ int main(int argc, char *argv[]) {
         correct_keystrokes_list[i] = 1; // initialize with 1
     }
 
-    stats stats;
-
-    // Load or initialize stats
-    if (!load_stats(args.player_name, &stats)) {
-        init_stats(&stats);
-    }
+    // Init stats for this game
+    stats game_stats;
+    init_stats(&game_stats);
 
     // Count down
     printf("\033[?25l"); // hide cursor
@@ -232,7 +229,7 @@ int main(int argc, char *argv[]) {
             gettimeofday(&key_timer_start, NULL);
 
             // Add success or fail for key
-            update_key_stats(&stats, input,
+            update_key_stats(&game_stats, input,
                              correct_keystrokes_list[current_idx],
                              elapsed_sec_for_key);
 
@@ -266,22 +263,28 @@ int main(int argc, char *argv[]) {
 
     double game_acc = calc_acc(text_len, correct_keystrokes);
 
-    if (game_wpm > stats.total.best_wpm) {
-        printf("\nDone! New record!\n");
-    } else {
-        printf("\nDone!\n");
+    printf("\nDone!\n");
+
+    update_total_stats(&game_stats, text_len, correct_keystrokes,
+                       game_elapsed_sec, game_wpm);
+
+    // Load stats for player
+    stats player_stats;
+    if (!load_stats(args.player_name, &player_stats)) {
+        init_stats(&player_stats);
     }
 
-    update_total_stats(&stats, text_len, correct_keystrokes, game_elapsed_sec,
-                       game_wpm);
-    save_stats(args.player_name, &stats);
+    // Add game stats to the player
+    merge_stats(&player_stats, &game_stats);
 
-    double avg_wpm =
-        calc_wpm(stats.total.total_keystrokes, stats.total.time_spent);
+    save_stats(args.player_name, &player_stats);
+
+    double avg_wpm = calc_wpm(player_stats.total.total_keystrokes,
+                              player_stats.total.time_spent);
     double wpm_diff = game_wpm - avg_wpm;
 
-    double avg_acc =
-        calc_acc(stats.total.total_keystrokes, stats.total.correct_keystrokes);
+    double avg_acc = calc_acc(player_stats.total.total_keystrokes,
+                              player_stats.total.correct_keystrokes);
     double acc_diff = game_acc - avg_acc;
 
     if (wpm_diff < 0) {
@@ -299,5 +302,5 @@ int main(int argc, char *argv[]) {
                acc_diff);
     }
 
-    print_stats(&stats);
+    print_stats(&player_stats);
 }
