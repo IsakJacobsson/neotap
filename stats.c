@@ -27,6 +27,8 @@ void init_stats(stats *s) {
             malloc(sizeof(double) * s->per_key[i].history_len);
         s->per_key[i].acc_history =
             malloc(sizeof(int) * s->per_key[i].history_len);
+        s->per_key[i].prev_key_history =
+            malloc(sizeof(char) * s->per_key[i].history_len);
 
         // zero-initialize
         if (s->per_key[i].wpm_history)
@@ -35,11 +37,15 @@ void init_stats(stats *s) {
         if (s->per_key[i].acc_history)
             memset(s->per_key[i].acc_history, 0,
                    sizeof(int) * s->per_key[i].history_len);
+        if (s->per_key[i].prev_key_history)
+            memset(s->per_key[i].prev_key_history, '\0',
+                   sizeof(int) * s->per_key[i].history_len);
     }
 }
 
 // Append to dynamic array, grow if needed
-static void append_history(key_stats *k, double wpm, int correct) {
+static void append_history(key_stats *k, double wpm, int correct,
+                           char prev_key) {
     if (k->pressed >= k->history_len) {
         // Grow by 2x
         k->history_len *= 2;
@@ -49,16 +55,18 @@ static void append_history(key_stats *k, double wpm, int correct) {
     }
     k->wpm_history[k->pressed] = wpm;
     k->acc_history[k->pressed] = correct;
+    k->prev_key_history[k->pressed] = prev_key;
 }
 
-void update_key_stats(stats *s, char key_char, int correct, double time_taken) {
+void update_key_stats(stats *s, char key_char, int correct, double time_taken,
+                      char prev_key) {
     if (key_char < 'a' || key_char > 'z')
         return;
 
     int index = key_char - 'a';
 
     double wpm = calc_wpm(1, time_taken);
-    append_history(&s->per_key[index], wpm, correct);
+    append_history(&s->per_key[index], wpm, correct, prev_key);
 
     s->per_key[index].pressed++;
     s->per_key[index].correct += correct;
@@ -129,13 +137,22 @@ void save_game_history(const char *player_name, stats *s) {
     char keys_csvfile[256];
     snprintf(keys_csvfile, sizeof(keys_csvfile), "%s%s.key-history.csv",
              STATS_FILE_BASE_NAME, player_name);
-    FILE *keys_csv = open_csv_with_header(keys_csvfile, "date,key,wpm,acc");
+    FILE *keys_csv =
+        open_csv_with_header(keys_csvfile, "date,key,prevKey,wpm,acc");
     if (keys_csv) {
         for (int i = 0; i < NUM_KEYS; i++) {
             for (int j = 0; j < s->per_key[i].pressed; j++) {
-                fprintf(keys_csv, "%s,%c,%.6f,%d\n", datetimebuf,
-                        s->per_key[i].key, s->per_key[i].wpm_history[j],
-                        s->per_key[i].acc_history[j]);
+                if (s->per_key[i].prev_key_history[j] == '\0') {
+                    fprintf(keys_csv, "%s,%c,%s,%.6f,%d\n", datetimebuf,
+                            s->per_key[i].key, "", s->per_key[i].wpm_history[j],
+                            s->per_key[i].acc_history[j]);
+                } else {
+                    fprintf(keys_csv, "%s,%c,%c,%.6f,%d\n", datetimebuf,
+                            s->per_key[i].key,
+                            s->per_key[i].prev_key_history[j],
+                            s->per_key[i].wpm_history[j],
+                            s->per_key[i].acc_history[j]);
+                }
             }
         }
         fclose(keys_csv);

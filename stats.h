@@ -9,6 +9,7 @@ typedef struct {
     double time_spent;
     double *wpm_history;
     int *acc_history;
+    char *prev_key_history;
     int history_len;
 } key_stats;
 
@@ -27,7 +28,8 @@ typedef struct {
 
 void init_stats(stats *s);
 
-void update_key_stats(stats *s, char key_char, int correct, double time_taken);
+void update_key_stats(stats *s, char key_char, int correct, double time_taken,
+                      char prev_key);
 
 void update_total_stats(stats *stats, int total_keystrokes,
                         int correct_keystrokes, double time, double wpm);

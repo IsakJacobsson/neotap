@@ -229,9 +229,13 @@ int main(int argc, char *argv[]) {
             gettimeofday(&key_timer_start, NULL);
 
             // Add success or fail for key
+            char prev_key = '\0'; // default
+            if (current_idx > 0) {
+                prev_key = text[current_idx - 1];
+            }
             update_key_stats(&game_stats, input,
                              correct_keystrokes_list[current_idx],
-                             elapsed_sec_for_key);
+                             elapsed_sec_for_key, prev_key);
 
             current_idx++;
             col++;
