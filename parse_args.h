@@ -5,6 +5,7 @@
 typedef struct {
     char *player_name;
     int num_words;
+    char *words_file;
 } args;
 
 // Parse command-line arguments

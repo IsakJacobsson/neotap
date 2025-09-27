@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     char **words = NULL;
-    int word_count = read_words("words.txt", &words);
+    int word_count = read_words(args.words_file, &words);
     if (word_count < 0) {
         return 1;
     }
