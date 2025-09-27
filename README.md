@@ -28,11 +28,26 @@ make
 ./neotap --player <NAME>
 ```
 
-4. To customize how many words to type in a game, use the `-w/--num-words`
-   option. For example to get 20 words:
+### Customize game
+
+#### Words per game
+
+It's possible to decide how many words to type in a game with the
+`-w/--num-words` option. For example to get 20 words:
 
 ```
 ./neotap --player <NAME> -w 20
+```
+
+#### Custom words
+
+With the `-f/--custom-words-file` option, you can pass a name of a file
+containing your custom words. For example, you can use with the provided custom
+words in `words/cli_words.txt`, or create your own file containing your own
+custom words:
+
+```
+./neotap --player <NAME> -f words/cli_words.txt
 ```
 
 ## Visualize your stats
