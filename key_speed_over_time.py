@@ -5,14 +5,16 @@ import argparse
 
 # --- Parse command-line arguments ---
 parser = argparse.ArgumentParser(description="Plot typing speed over time for a specific key.")
-parser.add_argument("key", type=str, help="The key to plot")
+parser.add_argument("-p", "--player", type=str, required=True, help="Player to show stats for")
+parser.add_argument("-k", "--key", type=str, required=True, help="The key to plot")
 parser.add_argument("-s", "--smoothness", type=int, default=1, help="Add rolling average of the graph")
 args = parser.parse_args()
+player = args.player
 key_to_plot = args.key
 smoothness = args.smoothness
 
 # --- Load CSV ---
-df = pd.read_csv("stats/isak.key-history.csv")
+df = pd.read_csv(f"stats/{player}.key-history.csv")
 
 # Filter for the specified key
 df_key = df[df['key'] == key_to_plot].copy()

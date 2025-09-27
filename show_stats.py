@@ -1,9 +1,16 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
+
+# --- Parse command-line arguments ---
+parser = argparse.ArgumentParser(description="Show various stats.")
+parser.add_argument("-p", "--player", type=str, required=True, help="Player to show stats for")
+args = parser.parse_args()
+player = args.player
 
 # --- Load CSV ---
-df = pd.read_csv("stats/isak.key-history.csv")
+df = pd.read_csv(f"stats/{player}.key-history.csv")
 
 # Convert date column to datetime and sort
 df['date'] = pd.to_datetime(df['date'])
