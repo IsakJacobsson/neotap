@@ -3,6 +3,8 @@
 Terminal based keyboard speed typing game with detailed stats tracking and
 visualizations.
 
+![Neotap demo](neotap-demo.png)
+
 ## How to play
 
 Follow the below steps to start playing:
@@ -24,6 +26,13 @@ make
 
 ```bash
 ./neotap --player <NAME>
+```
+
+4. To customize how many words to type in a game, use the `-w/--num-words`
+   option. For example to get 20 words:
+
+```
+./neotap --player <NAME> -w 20
 ```
 
 ## Visualize your stats
