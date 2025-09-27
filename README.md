@@ -3,7 +3,7 @@
 Terminal based keyboard speed typing game with detailed stats tracking and
 visualizations.
 
-![Neotap demo](neotap-demo.png)
+![Neotap demo](demo-images/neotap-demo.png)
 
 ## How to play
 
@@ -52,6 +52,17 @@ a specific keyboard key.
 ```
 python3 key_speed_over_time.py --player <NAME> --key <KEY>
 ```
+
+![key_speed_over_time-demo.png](demo-images/key_speed_over_time-demo.png)
+
+Get a smoothed graph based on running average by using the `-s/--smoothness`
+option. For example with a running average window of 20:
+
+```
+python3 key_speed_over_time.py -p <NAME> -k <KEY> -s 20
+```
+
+![key_speed_over_time-with-smoothness.png](demo-images/key_speed_over_time-with-smoothness.png)
 
 ### Various other stats
 
