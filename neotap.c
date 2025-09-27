@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,8 @@
 #include "parse_args.h"
 #include "parse_words.h"
 #include "stats.h"
+
+static struct termios old;
 
 static int get_terminal_width(void) {
     struct winsize w;
@@ -104,6 +107,14 @@ static void disable_raw_mode(struct termios *old) {
     tcsetattr(STDIN_FILENO, TCSANOW, old);
 }
 
+static void handle_signal(int sig) {
+    (void)sig;              // Sig is not used
+    disable_raw_mode(&old); // restore terminal settings
+    printf("\033[?25h\n");  // show cursor again
+    printf("Caught signal, exiting...\n");
+    exit(1);
+}
+
 static void print_text(const char *text, int *correct_chars, int current_idx,
                        int current_line) {
     int len = strlen(text);
@@ -139,6 +150,10 @@ int main(int argc, char *argv[]) {
     if (parse_arguments(argc, argv, &args) != 0)
         return 1;
 
+    // Catch termination signals and exit gracefully
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+
     // Seed the random generator
     srand(time(NULL));
 
@@ -159,7 +174,6 @@ int main(int argc, char *argv[]) {
     int text_len = strlen(text);
 
     // Save terminal mode
-    struct termios old;
     enable_raw_mode(&old);
 
     // Keep track of correct keystrokes for text
