@@ -30,7 +30,7 @@ make
 
 ### Customize game
 
-#### Words per game
+#### Number of words
 
 It's possible to decide how many words to type in a game with the
 `-w/--num-words` option. For example to get 20 words:
