@@ -110,7 +110,7 @@ static void disable_raw_mode(struct termios *old) {
 static void handle_signal(int sig) {
     (void)sig;              // Sig is not used
     disable_raw_mode(&old); // restore terminal settings
-    printf("\033[?25h\n");  // show cursor again
+    printf("\033[?25h\033[0 q\n");  // show cursor again + restore to block
     printf("Caught signal, exiting...\n");
     exit(1);
 }
@@ -204,6 +204,7 @@ int main(int argc, char *argv[]) {
         printf("\033[2K\r"); // clear counter line
     }
     printf("\033[?25h"); // show cursor again
+    printf("\033[6 q"); // bar cursor
 
     // Initial display
     printf("GO!\n%s", text);
@@ -277,6 +278,7 @@ int main(int argc, char *argv[]) {
     }
 
     disable_raw_mode(&old);
+    printf("\033[0 q"); // restore block cursor
     free(correct_keystrokes_list);
 
     double game_acc = calc_acc(text_len, correct_keystrokes);
